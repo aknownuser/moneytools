@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: moneytool
+      POSTGRES_PASSWORD: moneytool
+      POSTGRES_DB: moneytool
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U moneytool"]
+      interval: 5s
+      timeout: 5s
+
+      retries: 5
+  migrations:
+    image: arigaio/atlas:latest
+    command: migrate apply --url "postgres://moneytool:moneytool@postgres:5432/moneytool?sslmode=disable" --dir "file:///migrations"
+    volumes:
+      - ./migrations:/migrations
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  app:
+    build: .
+    environment:
+      DATABASE_URL: "postgres://moneytool:moneytool@postgres:5432/moneytool?sslmode=disable"
+    depends_on:
+      migrations:
+        condition: service_completed_successfully
+    ports:
+      - "8080:8080"
+
+volumes:
+  postgres_data:
